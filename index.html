@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ticket generator</title>
+  <style>
+  section {
+    display: none;
+  }
+  section.active {
+    display: inline-grid;
+  }
+
+  .framed {
+    border: 2px solid black;
+  }
+
+  * {
+    font-family: sans-serif;
+    margin: 0;
+  }
+
+  svg {
+    cursor: crosshair;
+  }
+
+
+  @media print {
+    h1 {
+      display: none;
+    }
+
+    svg {
+      page-break-after: always
+    }
+  }
+  </style>
+</head>
+<body>
+<section id="step1">
+  <h1>Step 1</h1>
+  <label>How many tickets?</label><input min="1" id="nTicketsEl" type="number" value="100"></number>
+  <label>Select ticket image?</label><input id="fileUpload" type="file">
+  <button onclick="goToStep2()">Next step</button>
+  <svg class="framed" id="svg1" width="210mm" height="297mm">
+    <g id="all">
+      <g>
+        <image id="ticketEl" alt="Your ticket"></image>
+      </g>
+    </g>
+  </svg>
+</input> 
+</section>
+<section id="step2">
+  <h1>Step 2</h1>
+  <p>Click the image below to place the ticket number</p>
+  <label>Image scale (set to 1 while clicking)</label><input id="imageScaleEl" step="0.1" min="0" value="1" type="number">
+  <label>Font size</label><input id="fontSizeEl" value="16" type="number">
+  <label>Font color</label><input id="fontColorEl" value="#000000" type="color">
+  <label>Font stroke color</label><input id="strokeColorEl" value="#FFFFFF" type="color">
+  <label>Stroke width</label><input id="strokeWidthEl" value="1" type="number">
+  <button onclick="goToStep3()">Next step</button>
+</section>
+<section id="step3">
+</section>
+<script>
+// Check if user is using Chromium derived browser as FireFox doesn't print right
+// and I can't figure out why not
+if (!navigator.userAgent.match(/chrom/i)) {
+  alert("This tool probably works best in a Chromium derived browser, but feel free to try it out");
+}
+
+// Number of steps 
+// 1. Upload ticket image
+// 2. Set location of text
+// 3. Layout in SVG & print
+
+// GLOBAL STATE
+const svgNS = "http://www.w3.org/2000/svg";
+let step = 1;
+
+let nTickets = localStorage.getItem("nTickets") || 100;
+let ticket = { data: undefined, type: undefined };
+let fontSize = localStorage.getItem("fontSize") || "16";
+let imageScale = localStorage.getItem("imageScale") || "1";
+let fontColor = localStorage.getItem("fontColor") ||"#000"
+let strokeColor = localStorage.getItem("strokeColor") || "#FFF"
+let strokeWidth = localStorage.getItem("strokeWidth") || "1";
+let clickEventListener = undefined;
+// END GLOBAL STATE
+
+function updateStep(newStep) {
+  let prev = document.getElementById(`step${step}`);
+  let next = document.getElementById(`step${newStep}`);
+  prev.classList.remove("active");
+  step = newStep;
+  next.classList.add("active");
+  
+}
+
+window.addEventListener("load", () => {
+  updateStep(1);
+  step1Init();
+})
+
+// Step 1 - file upload
+function step1Init() {
+  nTickets = localStorage.getItem("nTickets") || nTicketsEl.value;
+  nTicketsEl.value = nTickets
+}
+
+nTicketsEl.addEventListener("change", function (e) {
+  nTickets = Number(e.target.value);
+  localStorage.setItem("nTickets", nTickets)
+})
+
+fileUpload.addEventListener("change", function(e) {
+  console.log("Step 1")
+  
+  if (this.files.length < 1) {
+    return alert("Please select an image");
+  }
+  
+  ticket.type = this.files[0].type;
+  let reader = new FileReader();
+  reader.onloadend = function() {
+    ticket.data = reader.result;
+    ticketEl.setAttribute("href", `data:${ticket.type};charset=utf-8;base64,${btoa(ticket.data)}`);
+  }
+  reader.readAsBinaryString(this.files[0])
+})
+
+function goToStep2() {
+  console.log("Step 2")
+  if (!ticket.data) {
+    return alert("Please select an image first");
+  }
+  step2.appendChild(svg1);
+  updateStep(2);
+  step2Init();
+}
+
+// Step 2 - set location of text
+let textEl = undefined;
+
+function setTextPosition(event) {
+  pt.x = event.clientX;
+  pt.y = event.clientY;
+
+  // The cursor point, translated into svg coordinates
+  let cursorpt = pt.matrixTransform(svg1.getScreenCTM().inverse());
+  // Now we just need to handle the scale
+  let ticketX = cursorpt.x * (2 - imageScale);
+  let ticketY = cursorpt.y * (2 - imageScale);
+  localStorage.setItem("textX", ticketX);
+  localStorage.setItem("textY", ticketY);
+
+  textEl.setAttribute("x", ticketX)
+  textEl.setAttribute("y", ticketY)
+  setTicketScale()
+}
+
+let pt = svg1.createSVGPoint();
+function step2Init() {
+  textEl = document.createElementNS(svgNS, "text");
+  textEl.appendChild(document.createTextNode("NNN"));
+  textEl.setAttribute("x", "0");
+  textEl.setAttribute("y", "0");
+  textEl.setAttribute("font-size", fontSize);
+
+  fontSize = localStorage.getItem("fontSize") || fontSizeEl.value;
+  fontSizeEl.value = fontSize;
+  imageScale = localStorage.getItem("imageScale") || imageScaleEl.value;
+  imageScaleEl.value = imageScale
+  fontColor = localStorage.getItem("fontColor") || fontColorEl.value;
+  fontColorEl.value = fontColor
+  strokeColor = localStorage.getItem("strokeColor") || strokeColorEl.value;
+  strokeColorEl.value = strokeColor
+  strokeWidth = localStorage.getItem("strokeWidth") || strokeWidthEl.value;
+  strokeWidthEl.value = strokeWidth
+  setTextStyle()
+  setTicketScale()
+
+  ticketEl.parentNode.appendChild(textEl)
+  if ("textX" in localStorage && "textY" in localStorage) {
+    textEl.setAttribute("x", localStorage.getItem("textX"))
+    textEl.setAttribute("y", localStorage.getItem("textY"))
+  }
+  // Place text
+  svg1.addEventListener("click", setTextPosition);
+}
+
+imageScaleEl.addEventListener("change", (event) => {
+  imageScale = event.target.value;
+  localStorage.setItem("imageScale", imageScale);
+  setTicketScale()
+})
+fontSizeEl.addEventListener("change", (event) => {
+  fontSize = event.target.value;
+  localStorage.setItem("fontSize", fontSize);
+  setTextStyle();
+})
+fontColorEl.addEventListener("change", (event) => {
+  fontColor = event.target.value;
+  localStorage.setItem("fontColor", fontColor);
+  setTextStyle();
+})
+strokeColorEl.addEventListener("change", (event) => {
+  strokeColor = event.target.value;
+  localStorage.setItem("strokeColor", strokeColor);
+  setTextStyle();
+})
+strokeWidthEl.addEventListener("change", (event) => {
+  strokeWidth = event.target.value;
+  localStorage.setItem("strokeWidth", strokeWidth);
+  setTextStyle();
+})
+
+function setTextStyle() {
+  textEl.setAttribute("fill", fontColor);
+  textEl.setAttribute("font-size", fontSize);
+  textEl.setAttribute("stroke", strokeColor);
+  textEl.setAttribute("stroke-width", strokeWidth);
+}
+
+function setTicketScale() {
+  ticketEl.parentNode.setAttribute("transform", `scale(${imageScale})`);
+}
+
+function goToStep3() {
+  console.log("Step 3")
+  if (textEl.getAttribute("x") === "0") {
+    return alert("Please select a place for the text node (click your image)");
+  }
+  step3.appendChild(svg1);
+  updateStep(3);
+  step3Init();
+}
+// Step 3
+let ticketGroup = ticketEl.parentNode;
+function step3Init() {
+  svg1.removeEventListener("click", setTextPosition);
+  svg1.classList.remove("framed")
+  let ticketWidth = undefined;
+  let ticketHeight = undefined;
+  {
+    let bb = ticketGroup.getBoundingClientRect();
+    ticketWidth = bb.width;
+    ticketHeight = bb.height;
+  }
+  let xDisplacement = undefined;
+  let yDisplacement = undefined;
+  {
+    let bb = ticketGroup.getBBox();
+    xDisplacement = bb.width;
+    yDisplacement = bb.height;
+  }
+
+
+  let documentWidth = undefined;
+  let documentHeight = undefined;
+  {
+    let bb = svg1.getBoundingClientRect();
+    documentWidth = bb.width;
+    documentHeight = bb.height;
+  }
+  let nHorizontal = Math.floor(documentWidth / ticketWidth);
+  let nVertical = Math.floor(documentHeight / ticketHeight);
+  let nPages = Math.ceil(nTickets / (nVertical * nHorizontal));
+
+  for (let j = 0; j < nVertical; j++) {
+    for (let i = 0; i < nHorizontal; i++) {
+      if (i === 0 && j === 0) { continue }
+      let clone = ticketGroup.cloneNode(true)
+      clone.setAttribute("transform", `scale(${imageScale}) translate(${xDisplacement * i}, ${yDisplacement * j})`);
+      ticketGroup.parentElement.appendChild(clone);
+    }
+  }
+
+  // Calculate offsets, so we  can center the tickets on the page
+  let ticketSheetXOffset = undefined;
+  let ticketSheetYOffset = undefined;
+  {
+    let bb = all.getBBox();
+    ticketSheetXOffset = (documentWidth - bb.width) / 2;
+    ticketSheetYOffset = (documentHeight - bb.height) / 2;
+  }
+  all.setAttribute("transform", `translate(${ticketSheetXOffset}, ${ticketSheetYOffset})`);
+
+  let originalNode = document.getElementsByTagName("svg")[0];
+
+  for (let k = 1; k < nPages; k++) {
+    let nextPage = originalNode.cloneNode(true);
+    step3.appendChild(nextPage);
+  }
+
+  let ticketNumber = 0;
+  for (let el of document.getElementsByTagName("text")) {
+    el.textContent = ticketNumber.toString();
+    ticketNumber++;
+  }
+
+  document.title = `${nHorizontal*nVertical*nPages}-tickets`
+  window.print();
+
+}
+</script>
+</body>
