@@ -261,7 +261,9 @@ function step3Init() {
   {
     let bb = svg1.getBoundingClientRect();
     documentWidth = bb.width;
+    documentWidth *= 0.93
     documentHeight = bb.height;
+    documentHeight *= 0.90;
   }
   let nHorizontal = Math.floor(documentWidth / ticketWidth);
   let nVertical = Math.floor(documentHeight / ticketHeight);
