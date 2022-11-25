@@ -149,8 +149,8 @@ function setTextPosition(event) {
   // The cursor point, translated into svg coordinates
   let cursorpt = pt.matrixTransform(svg1.getScreenCTM().inverse());
   // Now we just need to handle the scale
-  let ticketX = cursorpt.x * (2 - imageScale);
-  let ticketY = cursorpt.y * (2 - imageScale);
+  let ticketX = cursorpt.x * (1 / imageScale);
+  let ticketY = cursorpt.y * (1 / imageScale);
   localStorage.setItem("textX", ticketX);
   localStorage.setItem("textY", ticketY);
 
